@@ -1,11 +1,27 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Stage, Layer, Text } from 'react-konva'
+import Link from 'next/link'
 import type Konva from 'konva'
 import TableComponent from '../../../components/table-component'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { useMediaQuery } from '@/hooks/use-media-query'
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '../../../convex/_generated/api'
+import { Id } from '../../../convex/_generated/dataModel'
 
-export default function NightPage({ params }: { params: { id: string } }) {
+export default function NightPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = React.use(params)
+    const nightData = useQuery(api.nights.getByShortId, { shortId: id })
+    const reservedSeats = useQuery(api.booking.listReservedSeatsByNight, 
+        nightData ? { nightId: nightData._id } : 'skip'
+    )
+    const createBookingMutation = useMutation(api.booking.createBooking)
     const [scale, setScale] = useState(1)
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 })
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
@@ -15,6 +31,19 @@ export default function NightPage({ params }: { params: { id: string } }) {
     const [lastCenter, setLastCenter] = useState<{ x: number; y: number } | null>(null)
     const [lastDist, setLastDist] = useState(0)
     const [selectedSeats, setSelectedSeats] = useState<{[key: string]: string[]}>({})
+    const [bookingOpen, setBookingOpen] = useState(false)
+    const [customerName, setCustomerName] = useState('')
+    const [customerPhone, setCustomerPhone] = useState('')
+    const isMobile = useMediaQuery('(max-width: 640px)')
+
+    // Process reserved seats data for table components
+    const reservedSeatIds = reservedSeats?.map(seat => seat.seatId) || []
+    const seatIdToBookingId = reservedSeats?.reduce((acc, seat) => {
+        acc[seat.seatId] = seat.bookingId
+        return acc
+    }, {} as { [seatId: string]: Id<"bookings"> }) || {}
+
+    
 
     const handleSeatSelection = useCallback((tableId: string, seatId: string, selected: boolean) => {
         setSelectedSeats(prev => {
@@ -33,34 +62,71 @@ export default function NightPage({ params }: { params: { id: string } }) {
         })
     }, [])
 
+    // Helper function to create TableComponent with reserved seats
+    const createTable = useCallback((props: { x: number; y: number; seats: number; rotation: 0 | 90; tableId: string }) => (
+        <TableComponent
+            {...props}
+            onSeatSelect={handleSeatSelection}
+            reservedSeatIds={reservedSeatIds}
+            seatIdToBookingId={seatIdToBookingId}
+        />
+    ), [handleSeatSelection, reservedSeatIds, seatIdToBookingId])
+
     const getTotalSelectedSeats = useCallback(() => {
         return Object.values(selectedSeats).flat().length
     }, [selectedSeats])
 
-    const handleBooking = useCallback(() => {
-        const totalSeats = getTotalSelectedSeats()
-        const bookingDetails = Object.entries(selectedSeats)
-            .filter(([, seats]) => seats.length > 0)
-            .map(([tableId, seats]) => `${tableId}: ${seats.join(', ')}`)
-            .join('\n')
-        
-        alert(`Prenotazione per ${totalSeats} posti:\n\n${bookingDetails}`)
-    }, [selectedSeats, getTotalSelectedSeats])
-    
-    const HEADER_HEIGHT = 64
+    const handleOpenBooking = useCallback(() => {
+        setBookingOpen(true)
+    }, [])
 
-    useEffect(() => {
-        const updateDimensions = () => {
-            setDimensions({
-                width: window.innerWidth,
-                height: window.innerHeight - HEADER_HEIGHT
+    const handleSubmitBooking = useCallback(async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!nightData) return
+
+        try {
+            const seats = Object.entries(selectedSeats)
+                .filter(([, seatIds]) => seatIds.length > 0)
+                .flatMap(([tableId, seatIds]) => 
+                    seatIds.map(seatId => ({ seatId, tableId }))
+                )
+
+            await createBookingMutation({
+                nightId: nightData._id,
+                customerName,
+                customerPhone,
+                seats
             })
+
+            setBookingOpen(false)
+            setCustomerName('')
+            setCustomerPhone('')
+            setSelectedSeats({})
+        } catch (error) {
+            alert(`Errore nella prenotazione: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
         }
-        
-        updateDimensions()
-        window.addEventListener('resize', updateDimensions)
-        
-        return () => window.removeEventListener('resize', updateDimensions)
+    }, [customerName, customerPhone, selectedSeats, createBookingMutation, nightData])
+    
+    useEffect(() => {
+        const container = containerRef.current
+        if (!container) return
+
+        // Set initial size
+        const rect = container.getBoundingClientRect()
+        setDimensions({ width: rect.width, height: rect.height })
+
+        // Observe container size changes
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const cr = entry.contentRect
+                setDimensions({ width: cr.width, height: cr.height })
+            }
+        })
+        ro.observe(container)
+
+        return () => {
+            ro.disconnect()
+        }
     }, [])
 
     const getDistance = useCallback((p1: { x: number; y: number }, p2: { x: number; y: number }) => {
@@ -196,21 +262,45 @@ export default function NightPage({ params }: { params: { id: string } }) {
         setLastDist(0)
     }, [])
 
-    return (
-        <div className="h-screen flex flex-col bg-gray-900 overflow-hidden">
-            <header className="bg-gray-800 text-white p-4 h-16 flex items-center justify-between shadow-lg z-20 flex-shrink-0">
-                <h1 className="text-xl font-bold">Night {params.id}</h1>
-                <div className="text-sm">
-                    Zoom: {Math.round(scale * 100)}%
+
+    // If night data doesn't exist (but query has completed), show error
+    if (nightData === null) {
+        return (
+            <div className="h-screen flex items-center justify-center bg-gray-900">
+                <div className="text-center text-white">
+                    <h1 className="text-4xl font-bold mb-4">Serata non trovata</h1>
+                    <Link href="/" className="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg transition-colors">
+                        Torna alla home
+                    </Link>
                 </div>
+            </div>
+        )
+    }
+
+    // Use fallback data while loading
+    const displayNightData = nightData || {
+        title: "Caricamento...",
+        date: "",
+        time: "",
+        color: "bg-blue-600",
+        hoverColor: "hover:bg-blue-700"
+    }
+
+    return (
+        <div className="h-dvh flex flex-col bg-gray-900 overflow-hidden">
+            <header className={`${displayNightData.color} text-white shadow-lg z-20 flex-shrink-0 h-14 px-3 flex items-center gap-4`}>
+                <Link 
+                    href="/" 
+                    className="bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded text-sm transition-colors text-white"
+                >
+                    ← Indietro
+                </Link>
+                <h1 className="text-base font-bold">{displayNightData.title}</h1>
             </header>
             
             <div 
                 ref={containerRef}
-                className="flex-1 overflow-hidden"
-                style={{ 
-                    height: `calc(100vh - ${HEADER_HEIGHT}px)`
-                }}
+                className="flex-1 overflow-hidden min-h-0"
             >
                 <Stage
                     ref={stageRef}
@@ -234,376 +324,61 @@ export default function NightPage({ params }: { params: { id: string } }) {
                 >
                     <Layer>
                         {/* Left Column Tables */}
-                        <TableComponent
-                            x={50}
-                            y={50}
-                            seats={12}
-                            rotation={0}
-                            tableId="T31"
-                            onSeatSelect={handleSeatSelection}
-                        />
+                        {createTable({ x: 50, y: 50, seats: 12, rotation: 0, tableId: "T31" })}
                         
-                        <TableComponent
-                            x={50}
-                            y={150}
-                            seats={12}
-                            rotation={0}
-                            tableId="T30"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={50}
-                            y={250}
-                            seats={12}
-                            rotation={0}
-                            tableId="T29"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={50}
-                            y={350}
-                            seats={12}
-                            rotation={0}
-                            tableId="T28"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={50}
-                            y={450}
-                            seats={12}
-                            rotation={0}
-                            tableId="T27"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={50}
-                            y={550}
-                            seats={12}
-                            rotation={0}
-                            tableId="T26"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={50}
-                            y={650}
-                            seats={12}
-                            rotation={0}
-                            tableId="T25"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={50}
-                            y={750}
-                            seats={12}
-                            rotation={0}
-                            tableId="T24"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={50}
-                            y={850}
-                            seats={12}
-                            rotation={0}
-                            tableId="T23"
-                            onSeatSelect={handleSeatSelection}
-                        />
+                        {createTable({ x: 50, y: 150, seats: 12, rotation: 0, tableId: "T30" })}
+                        {createTable({ x: 50, y: 250, seats: 12, rotation: 0, tableId: "T29" })}
+                        {createTable({ x: 50, y: 350, seats: 12, rotation: 0, tableId: "T28" })}
+                        {createTable({ x: 50, y: 450, seats: 12, rotation: 0, tableId: "T27" })}
+                        {createTable({ x: 50, y: 550, seats: 12, rotation: 0, tableId: "T26" })}
+                        {createTable({ x: 50, y: 650, seats: 12, rotation: 0, tableId: "T25" })}
+                        {createTable({ x: 50, y: 750, seats: 12, rotation: 0, tableId: "T24" })}
+                        {createTable({ x: 50, y: 850, seats: 12, rotation: 0, tableId: "T23" })}
 
                         {/* Right Column Tables */}
-                        <TableComponent
-                            x={350}
-                            y={50}
-                            seats={12}
-                            rotation={0}
-                            tableId="T40"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={350}
-                            y={150}
-                            seats={12}
-                            rotation={0}
-                            tableId="T39"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={350}
-                            y={250}
-                            seats={12}
-                            rotation={0}
-                            tableId="T38"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={350}
-                            y={350}
-                            seats={12}
-                            rotation={0}
-                            tableId="T37"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={350}
-                            y={450}
-                            seats={12}
-                            rotation={0}
-                            tableId="T36"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={350}
-                            y={550}
-                            seats={12}
-                            rotation={0}
-                            tableId="T35"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={350}
-                            y={650}
-                            seats={12}
-                            rotation={0}
-                            tableId="T34"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={350}
-                            y={750}
-                            seats={12}
-                            rotation={0}
-                            tableId="T33"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={430}
-                            y={850}
-                            seats={8}
-                            rotation={0}
-                            tableId="T32"
-                            onSeatSelect={handleSeatSelection}
-                        />
+                        {createTable({ x: 350, y: 50, seats: 16, rotation: 0, tableId: "T40" })}
+                        {createTable({ x: 350, y: 150, seats: 16, rotation: 0, tableId: "T39" })}
+                        {createTable({ x: 350, y: 250, seats: 16, rotation: 0, tableId: "T38" })}
+                        {createTable({ x: 350, y: 350, seats: 16, rotation: 0, tableId: "T37" })}
+                        {createTable({ x: 350, y: 450, seats: 16, rotation: 0, tableId: "T36" })}
+                        {createTable({ x: 350, y: 550, seats: 16, rotation: 0, tableId: "T35" })}
+                        {createTable({ x: 350, y: 650, seats: 16, rotation: 0, tableId: "T34" })}
+                        {createTable({ x: 350, y: 750, seats: 16, rotation: 0, tableId: "T33" })}
+                        {createTable({ x: 510, y: 850, seats: 8, rotation: 0, tableId: "T32" })}
 
                         {/* Bottom Section Tables T1-T22 */}
                         
                         {/* Top row T12-T22 - All vertical (90°) */}
-                        <TableComponent
-                            x={430}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T12"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={530}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T13"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={630}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T14"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={730}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T15"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={830}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T16"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={930}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T17"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1030}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T18"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1130}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T19"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1230}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T20"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1330}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T21"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1430}
-                            y={1000}
-                            seats={16}
-                            rotation={90}
-                            tableId="T22"
-                            onSeatSelect={handleSeatSelection}
-                        />
+                        {createTable({ x: 530, y: 1000, seats: 16, rotation: 90, tableId: "T12" })}
+                        {createTable({ x: 630, y: 1000, seats: 16, rotation: 90, tableId: "T13" })}
+                        {createTable({ x: 730, y: 1000, seats: 16, rotation: 90, tableId: "T14" })}
+                        {createTable({ x: 830, y: 1000, seats: 16, rotation: 90, tableId: "T15" })}
+                        {createTable({ x: 930, y: 1000, seats: 16, rotation: 90, tableId: "T16" })}
+                        {createTable({ x: 1030, y: 1000, seats: 16, rotation: 90, tableId: "T17" })}
+                        {createTable({ x: 1130, y: 1000, seats: 16, rotation: 90, tableId: "T18" })}
+                        {createTable({ x: 1230, y: 1000, seats: 16, rotation: 90, tableId: "T19" })}
+                        {createTable({ x: 1330, y: 1000, seats: 16, rotation: 90, tableId: "T20" })}
+                        {createTable({ x: 1430, y: 1000, seats: 16, rotation: 90, tableId: "T21" })}
+                        {createTable({ x: 1530, y: 1000, seats: 16, rotation: 90, tableId: "T22" })}
 
                         {/* Bottom row T1-T11 - All vertical (90°) */}
-                        <TableComponent
-                            x={430}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T1"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={530}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T2"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={630}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T3"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={730}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T4"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={830}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T5"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={930}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T6"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1030}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T7"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1130}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T8"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1230}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T9"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1330}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T10"
-                            onSeatSelect={handleSeatSelection}
-                        />
-                        
-                        <TableComponent
-                            x={1430}
-                            y={1350}
-                            seats={8}
-                            rotation={90}
-                            tableId="T11"
-                            onSeatSelect={handleSeatSelection}
-                        />
+                        {createTable({ x: 530, y: 1350, seats: 8, rotation: 90, tableId: "T1" })}
+                        {createTable({ x: 630, y: 1350, seats: 8, rotation: 90, tableId: "T2" })}
+                        {createTable({ x: 730, y: 1350, seats: 8, rotation: 90, tableId: "T3" })}
+                        {createTable({ x: 830, y: 1350, seats: 8, rotation: 90, tableId: "T4" })}
+                        {createTable({ x: 930, y: 1350, seats: 8, rotation: 90, tableId: "T5" })}
+                        {createTable({ x: 1030, y: 1350, seats: 8, rotation: 90, tableId: "T6" })}
+                        {createTable({ x: 1130, y: 1350, seats: 8, rotation: 90, tableId: "T7" })}
+                        {createTable({ x: 1230, y: 1350, seats: 8, rotation: 90, tableId: "T8" })}
+                        {createTable({ x: 1330, y: 1350, seats: 8, rotation: 90, tableId: "T9" })}
+                        {createTable({ x: 1430, y: 1350, seats: 8, rotation: 90, tableId: "T10" })}
+                        {createTable({ x: 1530, y: 1350, seats: 8, rotation: 90, tableId: "T11" })}
 
 
                         <Text
                             x={350}
                             y={-20}
-                            text="Capannone Tetti"
+                            text="Padiglione Dronero"
                             fontSize={32}
                             fontStyle="bold"
                             fill="#ffffff"
@@ -613,7 +388,7 @@ export default function NightPage({ params }: { params: { id: string } }) {
                         <Text
                             x={1000}
                             y={910}
-                            text="Capannone Dronero"
+                            text="Padiglione Centrale"
                             fontSize={32}
                             fontStyle="bold"
                             fill="#ffffff"
@@ -656,16 +431,99 @@ export default function NightPage({ params }: { params: { id: string } }) {
                 </Stage>
             </div>
 
-            {/* Floating Prenota Button */}
+            {/* Floating Prenota Button with Night Color */}
             {getTotalSelectedSeats() > 0 && (
                 <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 text-xs">
                     <button
-                        onClick={handleBooking}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105"
+                        onClick={handleOpenBooking}
+                        className={`${displayNightData.color} ${displayNightData.hoverColor} text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-colors`}
                     >
                         Prenota ({getTotalSelectedSeats()} {getTotalSelectedSeats() === 1 ? 'posto' : 'posti'})
                     </button>
                 </div>
+            )}
+
+            {/* Booking Form - Dialog on desktop, Drawer on mobile */}
+            {!isMobile ? (
+                <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Prenotazione</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleSubmitBooking} className="grid gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Nome</Label>
+                                <Input
+                                    id="name"
+                                    value={customerName}
+                                    onChange={(e) => setCustomerName(e.target.value)}
+                                    placeholder="Mario Rossi"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="phone">Numero di telefono</Label>
+                                <Input
+                                    id="phone"
+                                    type="tel"
+                                    value={customerPhone}
+                                    onChange={(e) => setCustomerPhone(e.target.value)}
+                                    placeholder="333 123 4567"
+                                    required
+                                    className="text-base"
+                                />
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                                Posti selezionati: {getTotalSelectedSeats()}
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setBookingOpen(false)}>Annulla</Button>
+                                <Button type="submit">Conferma</Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+            ) : (
+                <Drawer open={bookingOpen} onOpenChange={setBookingOpen} shouldScaleBackground={false}>
+                    <DrawerContent>
+                        <DrawerHeader>
+                            <DrawerTitle>Prenotazione</DrawerTitle>
+                        </DrawerHeader>
+                        <form onSubmit={handleSubmitBooking} className="grid gap-4 p-4 pt-0">
+                            <div className="space-y-2">
+                                <Label htmlFor="name-m">Nome</Label>
+                                <Input
+                                    id="name-m"
+                                    value={customerName}
+                                    onChange={(e) => setCustomerName(e.target.value)}
+                                    placeholder="Mario Rossi"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="phone-m">Numero di telefono</Label>
+                                <Input
+                                    id="phone-m"
+                                    type="tel"
+                                    value={customerPhone}
+                                    onChange={(e) => setCustomerPhone(e.target.value)}
+                                    placeholder="333 123 4567"
+                                    required
+                                    className="text-base"
+                                />
+                            </div>
+                            <div className="px-1 text-sm text-muted-foreground">
+                                Posti selezionati: {getTotalSelectedSeats()}
+                            </div>
+                            <DrawerFooter>
+                                <Button type="submit">Conferma</Button>
+                                <DrawerClose asChild>
+                                    <Button type="button" variant="outline">Annulla</Button>
+                                </DrawerClose>
+                            </DrawerFooter>
+                        </form>
+                    </DrawerContent>
+                </Drawer>
             )}
         </div>
     )

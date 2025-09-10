@@ -1,0 +1,18 @@
+[
+    {
+      "shortId": "1",
+      "title": "Patate all'Aioli",
+      "date": "Sabato 15 Marzo 2025",
+      "time": "20:00",
+      "color": "bg-amber-600",
+      "hoverColor": "hover:bg-amber-700"
+    },
+    {
+      "shortId": "2",
+      "title": "Polenta e Spezzatino",
+      "date": "Domenica 16 Marzo 2025", 
+      "time": "19:30",
+      "color": "bg-emerald-600",
+      "hoverColor": "hover:bg-emerald-700"
+    }
+  ]
