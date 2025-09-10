@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useCallback, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Stage, Layer, Text } from 'react-konva'
 import Link from 'next/link'
 import type Konva from 'konva'
@@ -37,11 +37,16 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
     const isMobile = useMediaQuery('(max-width: 640px)')
 
     // Process reserved seats data for table components
-    const reservedSeatIds = reservedSeats?.map(seat => seat.seatId) || []
-    const seatIdToBookingId = reservedSeats?.reduce((acc, seat) => {
-        acc[seat.seatId] = seat.bookingId
-        return acc
-    }, {} as { [seatId: string]: Id<"bookings"> }) || {}
+    const reservedSeatIds = useMemo(() => {
+        return reservedSeats?.map(seat => seat.seatId) || []
+    }, [reservedSeats])
+    
+    const seatIdToBookingId = useMemo(() => {
+        return reservedSeats?.reduce((acc, seat) => {
+            acc[seat.seatId] = seat.bookingId
+            return acc
+        }, {} as { [seatId: string]: Id<"bookings"> }) || {}
+    }, [reservedSeats])
 
     
 

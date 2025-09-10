@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Doc } from "@/convex/_generated/dataModel";
 
 export default function Home() {
   const nights = useQuery(api.nights.listAll) ?? [];
@@ -15,7 +16,7 @@ export default function Home() {
         </header>
 
         <div className="flex flex-col gap-6">
-          {nights.map((night: any) => (
+          {nights.map((night: Doc<"nights">) => (
             <Link key={night._id} href={`/night/${night.shortId}`}>
               <div className={`${night.color} ${night.hoverColor} text-white p-6 rounded-lg shadow-lg transition-colors`}>
                 <h3 className="text-xl font-bold mb-2">{night.title}</h3>
