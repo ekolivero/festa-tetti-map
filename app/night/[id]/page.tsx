@@ -32,6 +32,20 @@ export default function NightPage({ params }: { params: { id: string } }) {
             }
         })
     }, [])
+
+    const getTotalSelectedSeats = useCallback(() => {
+        return Object.values(selectedSeats).flat().length
+    }, [selectedSeats])
+
+    const handleBooking = useCallback(() => {
+        const totalSeats = getTotalSelectedSeats()
+        const bookingDetails = Object.entries(selectedSeats)
+            .filter(([, seats]) => seats.length > 0)
+            .map(([tableId, seats]) => `${tableId}: ${seats.join(', ')}`)
+            .join('\n')
+        
+        alert(`Prenotazione per ${totalSeats} posti:\n\n${bookingDetails}`)
+    }, [selectedSeats, getTotalSelectedSeats])
     
     const HEADER_HEIGHT = 64
 
@@ -587,18 +601,72 @@ export default function NightPage({ params }: { params: { id: string } }) {
 
 
                         <Text
-                            x={250}
-                            y={20}
-                            text="Restaurant Floor Plan - Click seats to book"
-                            fontSize={14}
+                            x={350}
+                            y={-20}
+                            text="Capannone Tetti"
+                            fontSize={32}
                             fontStyle="bold"
                             fill="#ffffff"
                             align="center"
                             offsetX={160}
                         />
+                        <Text
+                            x={1000}
+                            y={910}
+                            text="Capannone Dronero"
+                            fontSize={32}
+                            fontStyle="bold"
+                            fill="#ffffff"
+                            align="center"
+                            offsetX={160}
+                        />
+                        <Text
+                            x={20}
+                            y={1680}
+                            text="Ingresso ---"
+                            fontSize={44}
+                            fontStyle="bold"
+                            fill="#ffffff"
+                            align="center"
+                            offsetX={160}
+                        />
+                        <Text
+                            x={40}
+                            y={2000}
+                            text="BAR"
+                            fontSize={52}
+                            fontStyle="bold"
+                            fill="#ffffff"
+                            align="center"
+                            rotation={-90}
+                            offsetX={160}
+                        />
+                        <Text
+                            x={1400}
+                            y={2000}
+                            text="ORCHESTRA"
+                            fontSize={52}
+                            fontStyle="bold"
+                            fill="#ffffff"
+                            align="center"
+                            rotation={-90}
+                            offsetX={160}
+                        />
                     </Layer>
                 </Stage>
             </div>
+
+            {/* Floating Prenota Button */}
+            {getTotalSelectedSeats() > 0 && (
+                <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 text-xs">
+                    <button
+                        onClick={handleBooking}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105"
+                    >
+                        Prenota ({getTotalSelectedSeats()} {getTotalSelectedSeats() === 1 ? 'posto' : 'posti'})
+                    </button>
+                </div>
+            )}
         </div>
     )
 }
