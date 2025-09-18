@@ -14,6 +14,8 @@ interface TableComponentProps {
     seatIdToBookingId?: { [seatId: string]: string }
     highlightBookingId?: string | null
     onReservedSeatClick?: (args: { tableId: string; seatId: string; bookingId: string; seatCenter: { x: number; y: number } }) => void
+    selectedReservedSeatId?: string | null
+    selectedBookingId?: string | null
 }
 
 interface SeatState {
@@ -30,7 +32,9 @@ export default function TableComponent({
     reservedSeatIds,
     seatIdToBookingId,
     highlightBookingId,
-    onReservedSeatClick
+    onReservedSeatClick,
+    selectedReservedSeatId,
+    selectedBookingId
 }: TableComponentProps) {
     const [selectedSeats, setSelectedSeats] = useState<SeatState>({})
     const reservedSet = useMemo(() => new Set(reservedSeatIds ?? []), [reservedSeatIds])
@@ -146,6 +150,8 @@ export default function TableComponent({
             const bookingId = seatIdToBookingId?.[seatId]
             const isSelected = selectedSeats[seatId] || false
             const isHighlighted = Boolean(highlightBookingId && bookingId && bookingId === highlightBookingId)
+            const isSelectedForDeletion = selectedReservedSeatId === seatId
+            const isInSelectedBooking = Boolean(selectedBookingId && bookingId && bookingId === selectedBookingId)
             
             seatElements.push(
                 <Group key={seatId}>
@@ -154,7 +160,7 @@ export default function TableComponent({
                         y={seatY}
                         width={seatWidth}
                         height={seatHeight}
-                        fill={isReserved ? (isHighlighted ? '#7c3aed' : '#ef4444') : isSelected ? '#3b82f6' : '#f3f4f6'}
+                        fill={isReserved ? (isInSelectedBooking ? '#dc2626' : isHighlighted ? '#7c3aed' : '#ef4444') : isSelected ? '#3b82f6' : '#f3f4f6'}
                         stroke="#d1d5db"
                         strokeWidth={0.5}
                         onClick={() => handleSeatClick(seatId, { x: x + seatX + seatWidth / 2, y: y + seatY + seatHeight / 2 })}

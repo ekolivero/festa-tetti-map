@@ -22,6 +22,7 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
         nightData ? { nightId: nightData._id } : 'skip'
     )
     const createBookingMutation = useMutation(api.booking.createBooking)
+    const deleteBookingMutation = useMutation(api.booking.deleteBooking)
     const [scale, setScale] = useState(1)
     const [stagePos, setStagePos] = useState({ x: 0, y: 0 })
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
@@ -31,6 +32,7 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
     const [lastCenter, setLastCenter] = useState<{ x: number; y: number } | null>(null)
     const [lastDist, setLastDist] = useState(0)
     const [selectedSeats, setSelectedSeats] = useState<{[key: string]: string[]}>({})
+    const [selectedReservedSeat, setSelectedReservedSeat] = useState<{seatId: string, bookingId: Id<"bookings">, customerName: string} | null>(null)
     const [bookingOpen, setBookingOpen] = useState(false)
     const [customerName, setCustomerName] = useState('')
     const [customerPhone, setCustomerPhone] = useState('')
@@ -48,7 +50,23 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
         }, {} as { [seatId: string]: Id<"bookings"> }) || {}
     }, [reservedSeats])
 
-    
+    const handleReservedSeatClick = useCallback((args: { tableId: string; seatId: string; bookingId: string; seatCenter: { x: number; y: number } }) => {
+        const bookingId = args.bookingId as Id<"bookings">
+        const reservedSeat = reservedSeats?.find(seat => seat.seatId === args.seatId)
+        const customerName = reservedSeat?.bookingCustomerName || 'Sconosciuto'
+        setSelectedReservedSeat({ seatId: args.seatId, bookingId, customerName })
+    }, [reservedSeats])
+
+    const handleDeleteBooking = useCallback(async () => {
+        if (!selectedReservedSeat) return
+        
+        try {
+            await deleteBookingMutation({ bookingId: selectedReservedSeat.bookingId })
+            setSelectedReservedSeat(null)
+        } catch (error) {
+            alert(`Errore nell'eliminazione della prenotazione: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
+        }
+    }, [selectedReservedSeat, deleteBookingMutation])
 
     const handleSeatSelection = useCallback((tableId: string, seatId: string, selected: boolean) => {
         setSelectedSeats(prev => {
@@ -74,8 +92,11 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
             onSeatSelect={handleSeatSelection}
             reservedSeatIds={reservedSeatIds}
             seatIdToBookingId={seatIdToBookingId}
+            onReservedSeatClick={handleReservedSeatClick}
+            selectedReservedSeatId={selectedReservedSeat?.seatId || null}
+            selectedBookingId={selectedReservedSeat?.bookingId || null}
         />
-    ), [handleSeatSelection, reservedSeatIds, seatIdToBookingId])
+    ), [handleSeatSelection, reservedSeatIds, seatIdToBookingId, handleReservedSeatClick, selectedReservedSeat])
 
     const getTotalSelectedSeats = useCallback(() => {
         return Object.values(selectedSeats).flat().length
@@ -445,6 +466,29 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
                     >
                         Prenota ({getTotalSelectedSeats()} {getTotalSelectedSeats() === 1 ? 'posto' : 'posti'})
                     </button>
+                </div>
+            )}
+
+            {/* Floating Delete Button */}
+            {selectedReservedSeat && (
+                <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 text-xs flex flex-col items-center gap-2">
+                    <div className="bg-white text-gray-800 px-4 py-2 rounded-lg shadow-lg border">
+                        <span className="font-semibold">Prenotazione di: {selectedReservedSeat.customerName}</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleDeleteBooking}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-colors"
+                        >
+                            Elimina Prenotazione
+                        </button>
+                        <button
+                            onClick={() => setSelectedReservedSeat(null)}
+                            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-colors"
+                        >
+                            Annulla
+                        </button>
+                    </div>
                 </div>
             )}
 

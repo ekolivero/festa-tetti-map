@@ -120,4 +120,25 @@ export const getBooking = query({
   },
 });
 
+// Delete a booking and all its reserved seats.
+export const deleteBooking = mutation({
+  args: { bookingId: v.id("bookings") },
+  handler: async (ctx, { bookingId }) => {
+    // Delete all reserved seats for this booking
+    const reservedSeats = await ctx.db
+      .query("reservedSeats")
+      .withIndex("by_booking", (q) => q.eq("bookingId", bookingId))
+      .collect();
+    
+    await Promise.all(
+      reservedSeats.map((seat) => ctx.db.delete(seat._id))
+    );
+
+    // Delete the booking itself
+    await ctx.db.delete(bookingId);
+    
+    return { success: true };
+  },
+});
+
 
