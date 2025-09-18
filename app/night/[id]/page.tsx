@@ -104,6 +104,21 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
         }
     }, [selectedReservedSeat, deleteBookingMutation])
 
+    const handleCanvasClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+        // Only clear selections if clicking on the stage itself (empty canvas), not on shapes
+        if (e.target === e.target.getStage()) {
+            // Clear search selection when clicking on empty canvas
+            if (highlightBookingId) {
+                setHighlightBookingId(null)
+                setSelectedCustomer('')
+            }
+            // Clear reserved seat selection
+            if (selectedReservedSeat) {
+                setSelectedReservedSeat(null)
+            }
+        }
+    }, [highlightBookingId, selectedReservedSeat])
+
     const handleSeatSelection = useCallback((tableId: string, seatId: string, selected: boolean) => {
         setSelectedSeats(prev => {
             const tableSeats = prev[tableId] || []
@@ -416,6 +431,8 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
+                    onClick={handleCanvasClick}
+                    onTap={handleCanvasClick}
                     scaleX={scale}
                     scaleY={scale}
                     x={stagePos.x}
