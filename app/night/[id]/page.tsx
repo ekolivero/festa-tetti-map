@@ -14,11 +14,29 @@ import { useMediaQuery } from '@/hooks/use-media-query'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { Id } from '../../../convex/_generated/dataModel'
+import { Search, CheckIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 export default function NightPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = React.use(params)
     const nightData = useQuery(api.nights.getByShortId, { shortId: id })
     const reservedSeats = useQuery(api.booking.listReservedSeatsByNight, 
+        nightData ? { nightId: nightData._id } : 'skip'
+    )
+    const bookings = useQuery(api.booking.listBookingsByNight,
         nightData ? { nightId: nightData._id } : 'skip'
     )
     const createBookingMutation = useMutation(api.booking.createBooking)
@@ -33,6 +51,9 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
     const [lastDist, setLastDist] = useState(0)
     const [selectedSeats, setSelectedSeats] = useState<{[key: string]: string[]}>({})
     const [selectedReservedSeat, setSelectedReservedSeat] = useState<{seatId: string, bookingId: Id<"bookings">, customerName: string} | null>(null)
+    const [searchOpen, setSearchOpen] = useState(false)
+    const [selectedCustomer, setSelectedCustomer] = useState('')
+    const [highlightBookingId, setHighlightBookingId] = useState<string | null>(null)
     const [bookingOpen, setBookingOpen] = useState(false)
     const [customerName, setCustomerName] = useState('')
     const [customerPhone, setCustomerPhone] = useState('')
@@ -49,6 +70,21 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
             return acc
         }, {} as { [seatId: string]: Id<"bookings"> }) || {}
     }, [reservedSeats])
+
+    // Process customer list for search
+    const customers = useMemo(() => {
+        if (!bookings) return []
+        return bookings.map(booking => ({
+            value: booking._id,
+            label: booking.customerName,
+        }))
+    }, [bookings])
+
+    const handleCustomerSelect = useCallback((bookingId: string) => {
+        setSelectedCustomer(bookingId)
+        setHighlightBookingId(bookingId === selectedCustomer ? null : bookingId)
+        setSearchOpen(false)
+    }, [selectedCustomer])
 
     const handleReservedSeatClick = useCallback((args: { tableId: string; seatId: string; bookingId: string; seatCenter: { x: number; y: number } }) => {
         const bookingId = args.bookingId as Id<"bookings">
@@ -92,11 +128,12 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
             onSeatSelect={handleSeatSelection}
             reservedSeatIds={reservedSeatIds}
             seatIdToBookingId={seatIdToBookingId}
+            highlightBookingId={highlightBookingId}
             onReservedSeatClick={handleReservedSeatClick}
             selectedReservedSeatId={selectedReservedSeat?.seatId || null}
             selectedBookingId={selectedReservedSeat?.bookingId || null}
         />
-    ), [handleSeatSelection, reservedSeatIds, seatIdToBookingId, handleReservedSeatClick, selectedReservedSeat])
+    ), [handleSeatSelection, reservedSeatIds, seatIdToBookingId, highlightBookingId, handleReservedSeatClick, selectedReservedSeat])
 
     const getTotalSelectedSeats = useCallback(() => {
         return Object.values(selectedSeats).flat().length
@@ -321,7 +358,50 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
                 >
                     ← Indietro
                 </Link>
-                <h1 className="text-base font-bold">{displayNightData.title}</h1>
+                <h1 className="text-base font-bold flex-1">{displayNightData.title}</h1>
+                
+                {/* Search Customer */}
+                <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-white hover:bg-white/20"
+                        >
+                            <Search className="h-4 w-4" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[250px] p-0" align="end">
+                        <Command>
+                            <CommandInput placeholder="Cerca cliente..." />
+                            <CommandList>
+                                <CommandEmpty>Nessun cliente trovato.</CommandEmpty>
+                                <CommandGroup>
+                                    {customers.map((customer) => (
+                                        <CommandItem
+                                            key={customer.value}
+                                            value={customer.label}
+                                            onSelect={(currentLabel) => {
+                                                const selectedBooking = customers.find(c => c.label === currentLabel)
+                                                if (selectedBooking) {
+                                                    handleCustomerSelect(selectedBooking.value === selectedCustomer ? "" : selectedBooking.value)
+                                                }
+                                            }}
+                                        >
+                                            <CheckIcon
+                                                className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    selectedCustomer === customer.value ? "opacity-100" : "opacity-0"
+                                                )}
+                                            />
+                                            {customer.label}
+                                        </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                            </CommandList>
+                        </Command>
+                    </PopoverContent>
+                </Popover>
             </header>
             
             <div 
