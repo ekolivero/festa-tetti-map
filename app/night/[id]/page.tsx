@@ -446,17 +446,17 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
                     }}
                 >
                     <Layer>
-                        {/* Left Column Tables */}
-                        {createTable({ x: 50, y: 50, seats: 12, rotation: 0, tableId: "T31" })}
-                        
-                        {createTable({ x: 50, y: 150, seats: 12, rotation: 0, tableId: "T30" })}
-                        {createTable({ x: 50, y: 250, seats: 12, rotation: 0, tableId: "T29" })}
-                        {createTable({ x: 50, y: 350, seats: 12, rotation: 0, tableId: "T28" })}
-                        {createTable({ x: 50, y: 450, seats: 12, rotation: 0, tableId: "T27" })}
-                        {createTable({ x: 50, y: 550, seats: 12, rotation: 0, tableId: "T26" })}
-                        {createTable({ x: 50, y: 650, seats: 12, rotation: 0, tableId: "T25" })}
-                        {createTable({ x: 50, y: 750, seats: 12, rotation: 0, tableId: "T24" })}
-                        {createTable({ x: 50, y: 850, seats: 12, rotation: 0, tableId: "T23" })}
+                        {/* Left Column Tables - T23-T30 have 16 seats, T31 has 8 seats */}
+                        {createTable({ x: -50, y: 50, seats: 8, rotation: 0, tableId: "T31" })}
+
+                        {createTable({ x: -50, y: 150, seats: 16, rotation: 0, tableId: "T30" })}
+                        {createTable({ x: -50, y: 250, seats: 16, rotation: 0, tableId: "T29" })}
+                        {createTable({ x: -50, y: 350, seats: 16, rotation: 0, tableId: "T28" })}
+                        {createTable({ x: -50, y: 450, seats: 16, rotation: 0, tableId: "T27" })}
+                        {createTable({ x: -50, y: 550, seats: 16, rotation: 0, tableId: "T26" })}
+                        {createTable({ x: -50, y: 650, seats: 16, rotation: 0, tableId: "T25" })}
+                        {createTable({ x: -50, y: 750, seats: 16, rotation: 0, tableId: "T24" })}
+                        {createTable({ x: -50, y: 850, seats: 16, rotation: 0, tableId: "T23" })}
 
                         {/* Right Column Tables */}
                         {createTable({ x: 350, y: 50, seats: 16, rotation: 0, tableId: "T40" })}
@@ -466,7 +466,7 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
                         {createTable({ x: 350, y: 450, seats: 16, rotation: 0, tableId: "T36" })}
                         {createTable({ x: 350, y: 550, seats: 16, rotation: 0, tableId: "T35" })}
                         {createTable({ x: 350, y: 650, seats: 16, rotation: 0, tableId: "T34" })}
-                        {createTable({ x: 350, y: 750, seats: 16, rotation: 0, tableId: "T33" })}
+                        {createTable({ x: 510, y: 750, seats: 8, rotation: 0, tableId: "T33" })}
                         {createTable({ x: 510, y: 850, seats: 8, rotation: 0, tableId: "T32" })}
 
                         {/* Bottom Section Tables T1-T22 */}

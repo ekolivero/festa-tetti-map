@@ -86,7 +86,7 @@ export default function TableComponent({
                 9: 65,   // Seats 65-72
                 10: 73,  // Seats 73-80
                 11: 81,  // Seats 81-88
-                
+
                 // Tables T12-T22 (top row, 16 seats each)
                 12: 89,  // Seats 89-104
                 13: 105, // Seats 105-120
@@ -99,23 +99,27 @@ export default function TableComponent({
                 20: 217, // Seats 217-232
                 21: 233, // Seats 233-248
                 22: 249, // Seats 249-264
-                
-                // Tables T23-T31 (left column, 12 seats each)
-                23: 265, // Seats 265-276
-                24: 277, // Seats 277-288
-                25: 289, // Seats 289-300
-                26: 301, // Seats 301-312
-                27: 313, // Seats 313-324
-                28: 325, // Seats 325-336
-                29: 337, // Seats 337-348
-                30: 349, // Seats 349-360
-                31: 361, // Seats 361-372
-                
+
+                // Tables T23-T30 (left column, now 16 seats each - preserving original 12)
+                23: 265, // Original seats 265-276, new seats 1001-1004
+                24: 277, // Original seats 277-288, new seats 1005-1008
+                25: 289, // Original seats 289-300, new seats 1009-1012
+                26: 301, // Original seats 301-312, new seats 1013-1016
+                27: 313, // Original seats 313-324, new seats 1017-1020
+                28: 325, // Original seats 325-336, new seats 1021-1024
+                29: 337, // Original seats 337-348, new seats 1025-1028
+                30: 349, // Original seats 349-360, new seats 1029-1032
+
+                // Table T31 (8 seats only)
+                31: 361, // Seats 361-368
+
                 // Table T32 (8 seats)
                 32: 373, // Seats 373-380
-                
-                // Tables T33-T40 (right column, 16 seats each)
-                33: 381, // Seats 381-396
+
+                // Table T33 (now 8 seats instead of 16)
+                33: 381, // Seats 381-388
+
+                // Tables T34-T40 (right column, 16 seats each)
                 34: 397, // Seats 397-412
                 35: 413, // Seats 413-428
                 36: 429, // Seats 429-444
@@ -124,17 +128,34 @@ export default function TableComponent({
                 39: 477, // Seats 477-492
                 40: 493, // Seats 493-508
             }
-            
+
             return seatRanges[tableNum] || (tableNum - 1) * 12 + 1
         }
-        
-        const baseNumber = getTableStartingSeat(tableNumber) - 1
-        
+
+        // Special handling for expanded tables T23-T30
+        const getSeatIdForPosition = (tableNum: number, position: number): string => {
+            // Tables T23-T30 need special handling for backward compatibility (16 seats each)
+            if (tableNum >= 23 && tableNum <= 30) {
+                if (position <= 12) {
+                    // Original seats - keep the same numbering
+                    const baseNumber = getTableStartingSeat(tableNum) - 1
+                    return (baseNumber + position).toString()
+                } else {
+                    // New seats (positions 13-16) - use 1000+ range
+                    const newSeatOffset = (tableNum - 23) * 4 + (position - 12)
+                    return (1000 + newSeatOffset).toString()
+                }
+            }
+
+            // All other tables use normal sequential numbering
+            const baseNumber = getTableStartingSeat(tableNum) - 1
+            return (baseNumber + position).toString()
+        }
+
         for (let i = 1; i <= seats; i++) {
             const rowIndex = i <= seatsPerRow ? 0 : 1
             const colIndex = i <= seatsPerRow ? i - 1 : i - seatsPerRow - 1
-            const seatNumber = baseNumber + i
-            const seatId = seatNumber.toString()
+            const seatId = getSeatIdForPosition(tableNumber, i)
             
             let seatX, seatY
             
