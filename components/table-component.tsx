@@ -3,6 +3,21 @@
 import { useMemo, useState } from 'react'
 import { Group, Rect, Text } from 'react-konva'
 
+const SEAT_COLORS = {
+    AVAILABLE: '#f3f4f6',
+    SELECTED: '#3b82f6',
+    RESERVED: '#ef4444',
+    RESERVED_SELECTED: 'green',
+    RESERVED_HIGHLIGHTED: '#7c3aed',
+    SELECTED_TEXT: 'white',
+    RESERVED_TEXT: 'white',
+    AVAILABLE_TEXT: '#374151',
+    STROKE: '#d1d5db',
+    TABLE_LABEL: '#ffffff',
+    TABLE_FILL: '#ffffff',
+    TABLE_STROKE: '#000000'
+} as const
+
 interface TableComponentProps {
     x: number
     y: number
@@ -181,8 +196,8 @@ export default function TableComponent({
                         y={seatY}
                         width={seatWidth}
                         height={seatHeight}
-                        fill={isReserved ? (isInSelectedBooking ? '#dc2626' : isHighlighted ? '#7c3aed' : '#ef4444') : isSelected ? '#3b82f6' : '#f3f4f6'}
-                        stroke="#d1d5db"
+                        fill={isReserved ? (isInSelectedBooking ? SEAT_COLORS.RESERVED_SELECTED : isHighlighted ? SEAT_COLORS.RESERVED_HIGHLIGHTED : SEAT_COLORS.RESERVED) : isSelected ? SEAT_COLORS.SELECTED : SEAT_COLORS.AVAILABLE}
+                        stroke={SEAT_COLORS.STROKE}
                         strokeWidth={0.5}
                         onClick={() => handleSeatClick(seatId, { x: x + seatX + seatWidth / 2, y: y + seatY + seatHeight / 2 })}
                         onTap={() => handleSeatClick(seatId, { x: x + seatX + seatWidth / 2, y: y + seatY + seatHeight / 2 })}
@@ -194,7 +209,7 @@ export default function TableComponent({
                         text={seatId}
                         fontSize={8}
                         fontStyle="bold"
-                        fill={isReserved ? 'white' : isSelected ? 'white' : '#374151'}
+                        fill={isReserved ? SEAT_COLORS.RESERVED_TEXT : isSelected ? SEAT_COLORS.SELECTED_TEXT : SEAT_COLORS.AVAILABLE_TEXT}
                         align="center"
                         verticalAlign="middle"
                         offsetX={seatId.length * 2.5}
@@ -216,23 +231,23 @@ export default function TableComponent({
                 text={tableId}
                 fontSize={12}
                 fontStyle="bold"
-                fill="#ffffff"
+                fill={SEAT_COLORS.TABLE_LABEL}
                 align="center"
                 offsetX={tableId.length * 3}
                 listening={false}
             />
-            
+
             <Rect
                 x={0}
                 y={0}
                 width={tableWidth}
                 height={tableHeight}
-                fill="#ffffff"
-                stroke="#000000"
+                fill={SEAT_COLORS.TABLE_FILL}
+                stroke={SEAT_COLORS.TABLE_STROKE}
                 strokeWidth={2}
                 cornerRadius={4}
             />
-            
+
             {renderSeats()}
         </Group>
     )

@@ -14,26 +14,26 @@ import { useMediaQuery } from '@/hooks/use-media-query'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '../../../convex/_generated/api'
 import { Id } from '../../../convex/_generated/dataModel'
-import { Search, CheckIcon } from 'lucide-react'
+import { Search, CheckIcon, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
 } from '@/components/ui/command'
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
 } from '@/components/ui/popover'
 
 export default function NightPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = React.use(params)
     const nightData = useQuery(api.nights.getByShortId, { shortId: id })
-    const reservedSeats = useQuery(api.booking.listReservedSeatsByNight, 
+    const reservedSeats = useQuery(api.booking.listReservedSeatsByNight,
         nightData ? { nightId: nightData._id } : 'skip'
     )
     const bookings = useQuery(api.booking.listBookingsByNight,
@@ -46,11 +46,11 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
     const stageRef = useRef<Konva.Stage>(null)
     const containerRef = useRef<HTMLDivElement>(null)
-    
+
     const [lastCenter, setLastCenter] = useState<{ x: number; y: number } | null>(null)
     const [lastDist, setLastDist] = useState(0)
-    const [selectedSeats, setSelectedSeats] = useState<{[key: string]: string[]}>({})
-    const [selectedReservedSeat, setSelectedReservedSeat] = useState<{seatId: string, bookingId: Id<"bookings">, customerName: string} | null>(null)
+    const [selectedSeats, setSelectedSeats] = useState<{ [key: string]: string[] }>({})
+    const [selectedReservedSeat, setSelectedReservedSeat] = useState<{ seatId: string, bookingId: Id<"bookings">, customerName: string } | null>(null)
     const [searchOpen, setSearchOpen] = useState(false)
     const [selectedCustomer, setSelectedCustomer] = useState('')
     const [highlightBookingId, setHighlightBookingId] = useState<string | null>(null)
@@ -63,7 +63,7 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
     const reservedSeatIds = useMemo(() => {
         return reservedSeats?.map(seat => seat.seatId) || []
     }, [reservedSeats])
-    
+
     const seatIdToBookingId = useMemo(() => {
         return reservedSeats?.reduce((acc, seat) => {
             acc[seat.seatId] = seat.bookingId
@@ -80,11 +80,27 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
         }))
     }, [bookings])
 
+
     const handleCustomerSelect = useCallback((bookingId: string) => {
+        console.log('pressed')
         setSelectedCustomer(bookingId)
-        setHighlightBookingId(bookingId === selectedCustomer ? null : bookingId)
+        setHighlightBookingId(bookingId)
         setSearchOpen(false)
-    }, [selectedCustomer])
+    }, [])
+
+    const handleClearSelection = useCallback(() => {
+        setSelectedCustomer('')
+        setHighlightBookingId(null)
+    }, [])
+
+    // Get table numbers for selected customer
+    const selectedCustomerTables = useMemo(() => {
+        if (!selectedCustomer || !reservedSeats) return []
+        const tables = reservedSeats
+            .filter(seat => seat.bookingId === selectedCustomer)
+            .map(seat => seat.tableId)
+        return [...new Set(tables)].sort()
+    }, [selectedCustomer, reservedSeats])
 
     const handleReservedSeatClick = useCallback((args: { tableId: string; seatId: string; bookingId: string; seatCenter: { x: number; y: number } }) => {
         const bookingId = args.bookingId as Id<"bookings">
@@ -95,7 +111,7 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
 
     const handleDeleteBooking = useCallback(async () => {
         if (!selectedReservedSeat) return
-        
+
         try {
             await deleteBookingMutation({ bookingId: selectedReservedSeat.bookingId })
             setSelectedReservedSeat(null)
@@ -107,17 +123,12 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
     const handleCanvasClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
         // Only clear selections if clicking on the stage itself (empty canvas), not on shapes
         if (e.target === e.target.getStage()) {
-            // Clear search selection when clicking on empty canvas
-            if (highlightBookingId) {
-                setHighlightBookingId(null)
-                setSelectedCustomer('')
-            }
             // Clear reserved seat selection
             if (selectedReservedSeat) {
                 setSelectedReservedSeat(null)
             }
         }
-    }, [highlightBookingId, selectedReservedSeat])
+    }, [selectedReservedSeat])
 
     const handleSeatSelection = useCallback((tableId: string, seatId: string, selected: boolean) => {
         setSelectedSeats(prev => {
@@ -165,7 +176,7 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
         try {
             const seats = Object.entries(selectedSeats)
                 .filter(([, seatIds]) => seatIds.length > 0)
-                .flatMap(([tableId, seatIds]) => 
+                .flatMap(([tableId, seatIds]) =>
                     seatIds.map(seatId => ({ seatId, tableId }))
                 )
 
@@ -184,7 +195,7 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
             alert(`Errore nella prenotazione: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
         }
     }, [customerName, customerPhone, selectedSeats, createBookingMutation, nightData])
-    
+
     useEffect(() => {
         const container = containerRef.current
         if (!container) return
@@ -220,24 +231,24 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
 
     const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
         e.evt.preventDefault()
-        
+
         const stage = e.target.getStage()
         if (!stage) return
-        
+
         const oldScale = stage.scaleX()
         const pointer = stage.getPointerPosition()
         if (!pointer) return
-        
+
         const mousePointTo = {
             x: (pointer.x - stage.x()) / oldScale,
             y: (pointer.y - stage.y()) / oldScale,
         }
-        
+
         const direction = e.evt.deltaY > 0 ? -1 : 1
         const scaleBy = 1.02
         const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy
         const finalScale = Math.max(0.1, Math.min(5, newScale))
-        
+
         setScale(finalScale)
         setStagePos({
             x: pointer.x - mousePointTo.x * finalScale,
@@ -247,27 +258,27 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
 
     const handleTouchStart = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
         const touches = e.evt.touches
-        
+
         if (touches.length === 2) {
             // Disable dragging for pinch gestures
             const stage = stageRef.current
             if (stage) {
                 stage.draggable(false)
             }
-            
+
             const touch1 = touches[0]
             const touch2 = touches[1]
-            
+
             const dist = getDistance(
                 { x: touch1.clientX, y: touch1.clientY },
                 { x: touch2.clientX, y: touch2.clientY }
             )
-            
+
             const center = getCenter(
                 { x: touch1.clientX, y: touch1.clientY },
                 { x: touch2.clientX, y: touch2.clientY }
             )
-            
+
             setLastDist(dist)
             setLastCenter(center)
         } else {
@@ -282,48 +293,48 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
     const handleTouchMove = useCallback((e: Konva.KonvaEventObject<TouchEvent>) => {
         e.evt.preventDefault()
         const touches = e.evt.touches
-        
+
         if (touches.length === 2 && lastCenter && lastDist > 0) {
             const touch1 = touches[0]
             const touch2 = touches[1]
-            
+
             const newDist = getDistance(
                 { x: touch1.clientX, y: touch1.clientY },
                 { x: touch2.clientX, y: touch2.clientY }
             )
-            
+
             const newCenter = getCenter(
                 { x: touch1.clientX, y: touch1.clientY },
                 { x: touch2.clientX, y: touch2.clientY }
             )
-            
+
             const stage = stageRef.current
             if (!stage) return
-            
+
             const scaleMultiplier = newDist / lastDist
             const newScale = Math.max(0.1, Math.min(5, scale * scaleMultiplier))
-            
+
             // Convert screen coordinates to stage coordinates
             const containerRect = containerRef.current?.getBoundingClientRect()
             if (!containerRect) return
-            
+
             const stageCenter = {
                 x: newCenter.x - containerRect.left,
                 y: newCenter.y - containerRect.top
             }
-            
+
             const oldScale = scale
             const mousePointTo = {
                 x: (stageCenter.x - stagePos.x) / oldScale,
                 y: (stageCenter.y - stagePos.y) / oldScale,
             }
-            
+
             setScale(newScale)
             setStagePos({
                 x: stageCenter.x - mousePointTo.x * newScale,
                 y: stageCenter.y - mousePointTo.y * newScale,
             })
-            
+
             setLastDist(newDist)
             setLastCenter(newCenter)
         }
@@ -335,7 +346,7 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
         if (stage) {
             stage.draggable(true)
         }
-        
+
         setLastCenter(null)
         setLastDist(0)
     }, [])
@@ -367,59 +378,74 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
     return (
         <div className="h-dvh flex flex-col bg-gray-900 overflow-hidden">
             <header className={`${displayNightData.color} text-white shadow-lg z-20 flex-shrink-0 h-14 px-3 flex items-center gap-4`}>
-                <Link 
-                    href="/" 
+                <Link
+                    href="/"
                     className="bg-gray-800 hover:bg-gray-700 px-2 py-1 rounded text-sm transition-colors text-white"
                 >
                     ← Indietro
                 </Link>
                 <h1 className="text-base font-bold flex-1">{displayNightData.title}</h1>
-                
+
                 {/* Search Customer */}
-                <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-                    <PopoverTrigger asChild>
+                {!selectedCustomer ? (
+                    <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-white hover:bg-white/20"
+                            >
+                                <Search className="h-4 w-4" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[250px] p-0" align="end">
+                            <Command>
+                                <CommandInput placeholder="Cerca cliente..." />
+                                <CommandList>
+                                    <CommandEmpty>Nessun cliente trovato.</CommandEmpty>
+                                    <CommandGroup>
+                                        {customers.map((customer) => (
+                                            <CommandItem
+                                                key={customer.value}
+                                                value={customer.label}
+                                                onSelect={() => {
+                                                    handleCustomerSelect(customer.value)
+                                                }}
+                                            >
+                                                <CheckIcon
+                                                    className={cn(
+                                                        "mr-2 h-4 w-4",
+                                                        selectedCustomer === customer.value ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                />
+                                                {customer.label}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        {selectedCustomerTables.length > 0 && (
+                            <span className="text-sm font-medium text-white">
+                                {selectedCustomerTables.join(', ')}
+                            </span>
+                        )}
                         <Button
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 text-white hover:bg-white/20"
+                            onClick={handleClearSelection}
                         >
-                            <Search className="h-4 w-4" />
+                            <X className="h-4 w-4" />
                         </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[250px] p-0" align="end">
-                        <Command>
-                            <CommandInput placeholder="Cerca cliente..." />
-                            <CommandList>
-                                <CommandEmpty>Nessun cliente trovato.</CommandEmpty>
-                                <CommandGroup>
-                                    {customers.map((customer) => (
-                                        <CommandItem
-                                            key={customer.value}
-                                            value={customer.label}
-                                            onSelect={(currentLabel) => {
-                                                const selectedBooking = customers.find(c => c.label === currentLabel)
-                                                if (selectedBooking) {
-                                                    handleCustomerSelect(selectedBooking.value === selectedCustomer ? "" : selectedBooking.value)
-                                                }
-                                            }}
-                                        >
-                                            <CheckIcon
-                                                className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    selectedCustomer === customer.value ? "opacity-100" : "opacity-0"
-                                                )}
-                                            />
-                                            {customer.label}
-                                        </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
-                    </PopoverContent>
-                </Popover>
+                    </div>
+                )}
             </header>
-            
-            <div 
+
+            <div
                 ref={containerRef}
                 className="flex-1 overflow-hidden min-h-0"
             >
@@ -470,7 +496,7 @@ export default function NightPage({ params }: { params: Promise<{ id: string }> 
                         {createTable({ x: 510, y: 850, seats: 8, rotation: 0, tableId: "T32" })}
 
                         {/* Bottom Section Tables T1-T22 */}
-                        
+
                         {/* Top row T12-T22 - All vertical (90°) */}
                         {createTable({ x: 530, y: 1000, seats: 16, rotation: 90, tableId: "T12" })}
                         {createTable({ x: 630, y: 1000, seats: 16, rotation: 90, tableId: "T13" })}
